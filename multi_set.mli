@@ -1,0 +1,12 @@
+type 'a ms =
+    private
+    | Multiset of 'a ms list
+    | Elem of int * 'a
+
+val len_Multiset : 'a ms -> int
+val cmpr_Multiset : ('a -> 'b -> int) -> 'a ms -> 'b ms -> int
+val flatten_Multiset : 'a ms -> 'a ms
+val fusion : ('a -> 'a -> int) -> 'a ms -> 'a ms -> 'a ms
+val scinde : 'a ms -> 'a ms * 'a ms
+val fusion_rec : ('a -> 'a -> int) -> 'a ms -> 'a ms
+val mk_Multiset : ('a -> 'a -> int) -> 'a list -> 'a ms
