@@ -1,7 +1,7 @@
-#load "multi_set2.cmo";;
-#load "term2.cmo";;
-open Multi_set2
-open Term2;;
+#load "multi_set.cmo";;
+#load "term.cmo";;
+open Multi_set
+open Term;;
 
   
 (**** Definition d'une subsitution ****)
@@ -9,10 +9,10 @@ open Term2;;
 (* module *)
 module AssocMap =
   struct
-    type t = Term2.term
+    type t = Term.term
     let compare = compare_term
   end;;
-module Si = Map.Make (AssocMap)
+module Si = Map.Make (AssocMap);;
   
 
 (* effectue une substitution *)
@@ -25,7 +25,27 @@ let rec sub_term si term = match term with
   | Var s -> sub si term
   | _ -> assert false;;
 
+(**** Supression des termes identiques de deux listes ****)
 
+let remove_term l1 l2 = 
+  let rec remove_term1 m t l lres = match l with
+    | [] -> [ Elem(m, t) ], lres
+    | Elem(m', v') :: tl ->
+       if eq t v' then
+	 let new_m = m - m' in
+	 let new_m' = m' - m in
+	 let r1 = if new_m <= 0 then [] else [ Elem(new_m, t) ] in
+	 let r2 = if new_m' <= 0 then (lres @ tl) else lres @ [ Elem(new_m', t) ] @ tl in
+	 r1, r2
+       else remove_term1 m t tl (lres @ [Elem(m', v')])
+  in
+  let rec remove_term2 l1 l2 lres = match l1 with
+    | [] -> lres, l2
+    | Elem(m, v) ::tl ->
+       let r = remove_term m v l2 [] in
+       remove_term2 tl (snd r) (lres @ (fst r))
+  in
+  remove_term2 l1 l2 [];;
   
 (**** Procedure de purification ****)
 
@@ -45,24 +65,26 @@ let purify l1 l2 =
   let rec aux l lres si i = match l with
     | [] -> si, lres
     | h :: tl ->
-       match h with Elem(m, v) ->
-	 let new_key = v in
-	 let new_var = var_auto "var" i in
-	 match (
-	   try
-	     Some(Si.find new_key si)
-	   with Not_found -> None) with
-	 | None -> aux tl (lres @ [Elem(m, new_var)]) (Si.add new_key new_var si) (i+1)
-	 | Some old_var ->  aux tl (lres @ [Elem(m, old_var)]) (si) (i+1)
+       match h with
+       | Elem(m, Var s) ->
+	  aux tl (lres @ [Elem(m, mk_Var s.name)]) si i
+       | Elem(m, v) ->
+	  let new_key = var_auto "__var__" i in
+	  let new_valr = v in
+	  let si = Si.add new_key new_valr si in
+	  aux tl (lres @ [Elem(m, new_key)]) si (i+1)
   in
+  let rmv = remove_term l1 l2 in
+  let l1 = fst rmv in
+  let l2 = snd rmv in
   let si = Si.empty in
-  let res = aux l1 [] si 1 in
-  let lres1 = snd res in
-  let si = fst res in
-  let res = aux l2 [] si (List.length l1) in
-  let lres2 = snd res in
-  let si = fst res in
-  (reverse si, (lres1, lres2) );;
+  let r1 = aux l1 [] si 1 in
+  let si = fst r1 in
+  let lres1 = snd r1 in
+  let r2 = aux l2 [] si ( (List.length l1)+1 ) in
+  let si = fst r2 in
+  let lres2 = snd r2 in
+  (si, (lres1, lres2) );;
 
 
   
@@ -119,11 +141,12 @@ let r x y z = mk_Symb {name="r" ; arity=3} [ x ; y ; z ];;
 
 let s x y z t = mk_Symb {name="s" ; arity=4} [ x ; y ; z ; t];;
 
-let ac1 = mk_SymbAC {name="plus"} [ a; a; a; f a; f a; f b; p a b; p c d ];;
-let ac2 = mk_SymbAC {name="plus"} [ a; a; q (f a) (g b); r (p (f a) (f c)) (g (g (g d))) (q a b) ; d ; d ; d ];;
+let ac1 = mk_SymbAC {name="plus"} [ a ; a ; a ; c ; c ; b ; b ; d ];;
+let ac2 = mk_SymbAC {name="plus"} [ b ; c ; d ; d ; d ; d ; a ; a ];;
 
-let r = 
+let r =
   match ac1, ac2 with
-    SymbAC(s, Multiset l1), SymbAC(s', Multiset l2) ->
-    purify l1 l2;;
+  | SymbAC(s, Multiset l1), SymbAC(s', Multiset l2) -> purify l1 l2;;
+
   Si.bindings (fst r);;
+    snd r;;

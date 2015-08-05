@@ -1,17 +1,17 @@
 type symb = { name : string ; arity : int ; }
-type op = { name : string ; }
+type symbAC = { name : string ; }
 type var = { name : string ; }
 
 type term =
     private
 	 | Symb of symb * term list
-	 | Op of op * term Multi_set.ms
+	 | SymbAC of symbAC * term Multi_set.ms
 	 | Var of var
 
 			   
 exception WrongArity of symb * int
 val mk_Symb : symb -> term list -> term
-val mk_Op : string -> term list -> term
+val mk_SymbAC : symbAC -> term list -> term
 val mk_Var : string -> term
   
 val eq : term -> term -> bool

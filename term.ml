@@ -1,4 +1,4 @@
-open Multi_set2;;
+open Multi_set;;
 
 (**** Les types ****)
 
