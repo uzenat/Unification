@@ -91,7 +91,7 @@ let purify l1 l2 =
 (**** Utilisation des equations diophantienne ****)
 
 (* transforme les deux listes purifie en une equation diophantienne *)
-let equat_to_purifylist l1 l2 =
+let equat_of_purifylist l1 l2 =
   let aux e = let (Elem(m, _)) = e in m in
   let aux2 l = Coefficient (List.map aux l) in
   Equation(aux2 l1, aux2 l2);;
