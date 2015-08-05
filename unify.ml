@@ -52,19 +52,13 @@ let remove_term l1 l2 =
        remove_term2 tl (snd r) (lres @ (fst r))
   in
   remove_term2 l1 l2 [];;
+
+
   
 (**** Procedure de purification ****)
 
 (* construit une variable avec un nom et un numero *)
 let var_auto s i = mk_Var (s ^ (string_of_int i));;
-
-(* renverse les clef et valeur d'une substitution *)
-let reverse si =
-  let aux e = match e with (key, valr) -> (valr, key) in
-  let aux2 si v = match v with (key, valr) -> Si.add key valr si in
-  let bind = Si.bindings si in
-  let rev_bind = List.map aux bind in
-  List.fold_left aux2 (Si.empty) rev_bind;; 
   
 (* purify deux listes d'element *)
 let purify l1 l2 =
@@ -133,32 +127,3 @@ let rec unify s t si =
      else Si.add s' t' si
   | _ , Var v -> unify t' s' si
   | _ -> assert false;;
-
-
-  
-let x = mk_Var "x";;
-let y = mk_Var "y";;
-let z = mk_Var "z";;
-let u = mk_Var "v";;
-let v = mk_Var "v";;
-
-let a = mk_Symb {name="a" ; arity=0} [];;
-let b = mk_Symb {name="b" ; arity=0} [];;
-let c = mk_Symb {name="c" ; arity=0} [];;
-let d = mk_Symb {name="d" ; arity=0} [];;
-
-let f x = mk_Symb {name="f" ; arity=1} [ x ];;
-let g x = mk_Symb {name="g" ; arity=1} [ x ];;
-
-let p x y = mk_Symb {name="p" ; arity=2} [ x ; y ];;
-let q x y = mk_Symb {name="q" ; arity=2} [ x ; y ];;
-  
-let r x y z = mk_Symb {name="r" ; arity=3} [ x ; y ; z ];;
-
-let s x y z t = mk_Symb {name="s" ; arity=4} [ x ; y ; z ; t];;
-
-let ac1 = mk_SymbAC {name="plus"} [ a ; a ; c ; d ];;
-let ac2 = mk_SymbAC {name="plus"} [ b ; b ; f x ];;
-
-let s = solve_dioph ac1 ac2;;
-VectSet.elements s;;
