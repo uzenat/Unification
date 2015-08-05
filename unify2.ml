@@ -1,5 +1,6 @@
 #load "multi_set2.cmo";;
 #load "term2.cmo";;
+open Multi_set2
 open Term2;;
 
   
@@ -9,9 +10,10 @@ open Term2;;
 module AssocMap =
   struct
     type t = Term2.term
-    let compare = compare_term 
+    let compare = compare_term
   end;;
 module Si = Map.Make (AssocMap)
+  
 
 (* effectue une substitution *)
 let sub si var =
@@ -23,10 +25,47 @@ let rec sub_term si term = match term with
   | Var s -> sub si term
   | _ -> assert false;;
 
+
+  
 (**** Procedure de purification ****)
 
-		  
-		      
+(* construit une variable avec un nom et un numero *)
+let var_auto s i = mk_Var (s ^ (string_of_int i));;
+
+(* renverse les clef et valeur d'une substitution *)
+let reverse si =
+  let aux e = match e with (key, valr) -> (valr, key) in
+  let aux2 si v = match v with (key, valr) -> Si.add key valr si in
+  let bind = Si.bindings si in
+  let rev_bind = List.map aux bind in
+  List.fold_left aux2 (Si.empty) rev_bind;; 
+  
+(* purify deux listes d'element *)
+let purify l1 l2 =
+  let rec aux l lres si i = match l with
+    | [] -> si, lres
+    | h :: tl ->
+       match h with Elem(m, v) ->
+	 let new_key = v in
+	 let new_var = var_auto "var" i in
+	 match (
+	   try
+	     Some(Si.find new_key si)
+	   with Not_found -> None) with
+	 | None -> aux tl (lres @ [Elem(m, new_var)]) (Si.add new_key new_var si) (i+1)
+	 | Some old_var ->  aux tl (lres @ [Elem(m, old_var)]) (si) (i+1)
+  in
+  let si = Si.empty in
+  let res = aux l1 [] si 1 in
+  let lres1 = snd res in
+  let si = fst res in
+  let res = aux l2 [] si (List.length l1) in
+  let lres2 = snd res in
+  let si = fst res in
+  (reverse si, (lres1, lres2) );;
+
+
+  
 (**** Procedure d'unification ****)
 
 exception SymbolClash;;
@@ -80,3 +119,11 @@ let r x y z = mk_Symb {name="r" ; arity=3} [ x ; y ; z ];;
 
 let s x y z t = mk_Symb {name="s" ; arity=4} [ x ; y ; z ; t];;
 
+let ac1 = mk_SymbAC {name="plus"} [ a; a; a; f a; f a; f b; p a b; p c d ];;
+let ac2 = mk_SymbAC {name="plus"} [ a; a; q (f a) (g b); r (p (f a) (f c)) (g (g (g d))) (q a b) ; d ; d ; d ];;
+
+let r = 
+  match ac1, ac2 with
+    SymbAC(s, Multiset l1), SymbAC(s', Multiset l2) ->
+    purify l1 l2;;
+  Si.bindings (fst r);;
