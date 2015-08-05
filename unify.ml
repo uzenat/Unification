@@ -1,4 +1,7 @@
-open Term;;
+#load "multi_set2.cmo";;
+#load "term2.cmo";;
+open Multi_set2
+open Term2;;
 
   
 (**** Definition d'une subsitution ****)
@@ -6,10 +9,11 @@ open Term;;
 (* module *)
 module AssocMap =
   struct
-    type t = Term.term
-    let compare = compare_term 
+    type t = Term2.term
+    let compare = compare_term
   end;;
 module Si = Map.Make (AssocMap)
+  
 
 (* effectue une substitution *)
 let sub si var =
@@ -20,6 +24,45 @@ let rec sub_term si term = match term with
   | Symb(s, args) -> mk_Symb s (List.map (sub_term si) args)
   | Var s -> sub si term
   | _ -> assert false;;
+
+
+  
+(**** Procedure de purification ****)
+
+(* construit une variable avec un nom et un numero *)
+let var_auto s i = mk_Var (s ^ (string_of_int i));;
+
+(* renverse les clef et valeur d'une substitution *)
+let reverse si =
+  let aux e = match e with (key, valr) -> (valr, key) in
+  let aux2 si v = match v with (key, valr) -> Si.add key valr si in
+  let bind = Si.bindings si in
+  let rev_bind = List.map aux bind in
+  List.fold_left aux2 (Si.empty) rev_bind;; 
+  
+(* purify deux listes d'element *)
+let purify l1 l2 =
+  let rec aux l lres si i = match l with
+    | [] -> si, lres
+    | h :: tl ->
+       match h with Elem(m, v) ->
+	 let new_key = v in
+	 let new_var = var_auto "var" i in
+	 match (
+	   try
+	     Some(Si.find new_key si)
+	   with Not_found -> None) with
+	 | None -> aux tl (lres @ [Elem(m, new_var)]) (Si.add new_key new_var si) (i+1)
+	 | Some old_var ->  aux tl (lres @ [Elem(m, old_var)]) (si) (i+1)
+  in
+  let si = Si.empty in
+  let res = aux l1 [] si 1 in
+  let lres1 = snd res in
+  let si = fst res in
+  let res = aux l2 [] si (List.length l1) in
+  let lres2 = snd res in
+  let si = fst res in
+  (reverse si, (lres1, lres2) );;
 
 
   
@@ -76,48 +119,11 @@ let r x y z = mk_Symb {name="r" ; arity=3} [ x ; y ; z ];;
 
 let s x y z t = mk_Symb {name="s" ; arity=4} [ x ; y ; z ; t];;
 
-(* Exemple 1: p(a, x) = p(z, f(z)) *)
-  
-let p1 = p a x;;
-let p2 = p z (f z) ;;
+let ac1 = mk_SymbAC {name="plus"} [ a; a; a; f a; f a; f b; p a b; p c d ];;
+let ac2 = mk_SymbAC {name="plus"} [ a; a; q (f a) (g b); r (p (f a) (f c)) (g (g (g d))) (q a b) ; d ; d ; d ];;
 
-let solution = Si.empty;;
-let solution = Si.add z a solution;;
-let solution = Si.add x (f a) solution;;
-
-let resultat = unify p1 p2 (Si.empty);;
-
-let bool = Si.equal eq solution resultat;;
-
-  assert bool;;
-  
-(* Exemple 2: r(g(x), f(y), a) = r(y, f(b), a) *)
-
-let p1 = r (g x) (f y) a ;;
-let p2 = r y (f b) a ;;
-Si.bindings (unify p1 p2 (Si.empty));;
-let bool =
-  try 
-    let r = unify p1 p2 (Si.empty) in
-    false
-  with SymbolClash -> true;;
-  
-  assert bool;;
-
-
-    
-(* Exemple 3: r(x, y, z) = r(q(v, v), q(x, x), q(y, y)) *)
-
-let p1 = r x y z;;
-let p2 = r (q v v) (q x x) (q y y);;
-
-let solution = Si.empty;;
-let solution = Si.add x (q v v) solution;;
-let solution = Si.add y (q (q v v) (q v v)) solution;;
-let solution = Si.add z (q (q (q v v) (q v v)) (q (q v v) (q v v))) solution;;
-
-let resultat = unify p1 p2 (Si.empty);;
-
-let bool = Si.equal eq solution resultat;;
-
-  assert bool;;
+let r = 
+  match ac1, ac2 with
+    SymbAC(s, Multiset l1), SymbAC(s', Multiset l2) ->
+    purify l1 l2;;
+  Si.bindings (fst r);;
