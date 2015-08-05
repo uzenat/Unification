@@ -1,7 +1,10 @@
 #load "multi_set.cmo";;
 #load "term.cmo";;
+#load "diophantienne.cmo";;
 open Multi_set
 open Term;;
+open Diophantienne;;
+
 
   
 (**** Definition d'une subsitution ****)
@@ -25,8 +28,11 @@ let rec sub_term si term = match term with
   | Var s -> sub si term
   | _ -> assert false;;
 
+
+  
 (**** Supression des termes identiques de deux listes ****)
 
+  
 let remove_term l1 l2 = 
   let rec remove_term1 m t l lres = match l with
     | [] -> [ Elem(m, t) ], lres
@@ -42,7 +48,7 @@ let remove_term l1 l2 =
   let rec remove_term2 l1 l2 lres = match l1 with
     | [] -> lres, l2
     | Elem(m, v) ::tl ->
-       let r = remove_term m v l2 [] in
+       let r = remove_term1 m v l2 [] in
        remove_term2 tl (snd r) (lres @ (fst r))
   in
   remove_term2 l1 l2 [];;
@@ -85,6 +91,16 @@ let purify l1 l2 =
   let si = fst r2 in
   let lres2 = snd r2 in
   (si, (lres1, lres2) );;
+
+
+  
+(**** Utilisation des equations diophantienne ****)
+
+(* transforme les deux listes purifie en une equation diophantienne *)
+let equat_to_purifylist l1 l2 =
+  let aux e = let (Elem(m, _)) = e in m in
+  let aux2 l = Coefficient (List.map aux l) in
+  Equation(aux2 l1, aux2 l2);;
 
 
   
@@ -141,12 +157,8 @@ let r x y z = mk_Symb {name="r" ; arity=3} [ x ; y ; z ];;
 
 let s x y z t = mk_Symb {name="s" ; arity=4} [ x ; y ; z ; t];;
 
-let ac1 = mk_SymbAC {name="plus"} [ a ; a ; a ; c ; c ; b ; b ; d ];;
-let ac2 = mk_SymbAC {name="plus"} [ b ; c ; d ; d ; d ; d ; a ; a ];;
+let ac1 = mk_SymbAC {name="plus"} [ a ; a ; c ; d ];;
+let ac2 = mk_SymbAC {name="plus"} [ b ; b ; f x ];;
 
-let r =
-  match ac1, ac2 with
-  | SymbAC(s, Multiset l1), SymbAC(s', Multiset l2) -> purify l1 l2;;
-
-  Si.bindings (fst r);;
-    snd r;;
+let s = solve_dioph ac1 ac2;;
+VectSet.elements s;;
