@@ -62,8 +62,7 @@ let rec eq_Vect v1 v2 = match v1, v2 with
 (* test si un vecteur est plus grand qu'un autre *)
 let rec plus_grand' l1 l2 = match l1, l2 with
   | [], [] -> true
-  | h1::tl1 , h2::tl2 -> (h1 >= h2) && (plus_grand' tl1 tl2)
-  | _ -> failwith "impossible" 
+  | h1::tl1 , h2::tl2 -> (h1 >= h2) && (plus_grand' tl1 tl2);;
 let plus_grand v1 v2 = match v1, v2 with
   | VectMod.Vect(l1, l2), VectMod.Vect(l1', l2') -> (plus_grand' l1 l1') && (plus_grand' l2 l2')
 let not_plus_grand v1 v2 = not (plus_grand v1 v2);;
@@ -130,3 +129,15 @@ let procedure equ =
   let p1 = init_P1 equ in
   let um = VectSet.empty in
   step p1 um equ ;;
+  
+let equ1 = mk_Equat [1;6] [2;4];;
+let equ2 = mk_Equat [2;1;1] [2;1];;
+let equ3 = mk_Equat [7;5;8;1;2;3;4;1;1;6;2;1] [2;5;4;3;9;8;4];;
+
+let p1 = procedure equ1;;
+let p2 = procedure equ2;;
+let p3 = procedure equ3;;
+
+  VectSet.elements p1;;
+    VectSet.elements p2;;
+      VectSet.elements p3;;
