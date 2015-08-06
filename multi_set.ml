@@ -67,3 +67,11 @@ let mk_Multiset cmpr l =
     | h :: tl -> Elem(1,h) :: (aux tl)
   in
   fusion_rec cmpr (Multiset(aux l));;
+
+let mk_Multiset2 l =
+  let rec aux l = match l with
+    | [] -> []
+    | Elem(0, v) :: tl -> aux tl
+    | h::tl -> h:: aux tl
+  in
+  Multiset(aux l);;

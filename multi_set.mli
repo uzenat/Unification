@@ -6,3 +6,4 @@ val fusion : ('a -> 'a -> int) -> 'a ms -> 'a ms -> 'a ms
 val scinde : 'a ms -> 'a ms * 'a ms
 val fusion_rec : ('a -> 'a -> int) -> 'a ms -> 'a ms
 val mk_Multiset : ('a -> 'a -> int) -> 'a list -> 'a ms
+val mk_Multiset2 : 'a elem list -> 'a ms

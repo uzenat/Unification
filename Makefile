@@ -1,4 +1,4 @@
-SOURCES=multi_set.ml term.ml
+SOURCES=multi_set.ml diophantienne.ml term.ml
 OBJECTS=$(SOURCES:.ml=.cmo)
 INTERFACES=$(SOURCES:.ml=.mli)
 FLAGS=-g

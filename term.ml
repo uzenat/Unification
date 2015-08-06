@@ -67,6 +67,7 @@ let rec is_occurs v t = match t with
   | Var _ -> eq v t
   | _ -> assert false;;
 
+(* construit un symbole associatif et commutatif *)
 let mk_SymbAC s args =
   let rec aux l l1 l2 = match l with
     | [] -> l1, l2
@@ -86,15 +87,35 @@ let mk_SymbAC s args =
   let ms = mk_Multiset compare_term (List.sort compare_term (fst r)) in
   SymbAC( s, aux2 s ms (snd r) );;
 
+let mk_SymbAC2 s ms = SymbAC(s, ms);;
 
-let a = mk_Symb {name="a" ; arity=0} [];;
-let b = mk_Symb {name="b" ; arity=0} [];;
-let c = mk_Symb {name="c" ; arity=0} [];;
-let d = mk_Symb {name="d" ; arity=0} [];;
-let e = mk_Symb {name="e" ; arity=0} [];;
 
-let ac01 = mk_SymbAC {name="plus"} [ a ; b ];;
-let ac02 = mk_SymbAC {name="fois"} [ a ; a ; b ];;
-let ac1 = mk_SymbAC {name="plus"} [ ac02 ; a ; b ; a ; b ; ac02 ; a ; a ; a ; e ; e ; d ; ac01 ];;
-let ac2 = mk_SymbAC {name="plus"} [ ac02 ; ac02 ; e ; d ; e ; ac01 ; a ; b ; a ; b ; a ; a ; a ];;
- eq ac1 ac2;;
+
+(**** Definition d'une subsitution ****)
+
+(* module *)
+module AssocMap =
+  struct
+    type t = term
+    let compare = compare_term
+  end;;
+module Si = Map.Make (AssocMap);;
+
+(* effectue une substitution *)
+let sub_term si term =
+  let sub si var =
+    try
+      Si.find var si 
+    with Not_found -> var
+  in
+  let rec sub_term' si term = match term with
+    | Symb(s, args) -> mk_Symb s (List.map (sub_term' si) args)
+    | Var s -> sub si term
+    | _ -> assert false
+  in
+  sub_term' si term;;
+
+(* construit une table a partir d'une list d'element (cle, valeur) *)
+let rec si_of_list l = match l with
+  | [] -> Si.empty
+  | (key,valr)::tl -> Si.add key valr (si_of_list tl);;

@@ -5,30 +5,6 @@ open Multi_set
 open Term;;
 open Diophantienne;;
 
-
-  
-(**** Definition d'une subsitution ****)
-
-(* module *)
-module AssocMap =
-  struct
-    type t = Term.term
-    let compare = compare_term
-  end;;
-module Si = Map.Make (AssocMap);;
-  
-
-(* effectue une substitution *)
-let sub si var =
-  try
-    Si.find var si 
-  with Not_found -> var;;
-let rec sub_term si term = match term with
-  | Symb(s, args) -> mk_Symb s (List.map (sub_term si) args)
-  | Var s -> sub si term
-  | _ -> assert false;;
-
-
   
 (**** Supression des termes identiques de deux listes ****)
 
@@ -97,6 +73,91 @@ let equat_of_purifylist l1 l2 =
   Equation(aux2 l1, aux2 l2);;
 
 
+  
+(**** Travail preliminaire 1 :                                               ****
+ **** On veut, a partir des deux listes purifies, recuperer une substitution ****
+ **** qui substitue a chaque variable purife des deux listes                 ****
+ **** la somme ponderer des nouvelles variable creer par les solutions de la ****
+ **** base de l'equation diophantienne creer a partir des deux listes        ****)
+
+(* - a partir des deux listes purifies, on creer une equation diophantienne
+     ET on resoud l'equation diophantienne en generant une base de solutions *)
+let solve_dioph l1 l2 = 
+  let equ = equat_of_purifylist l1 l2 in
+  VectSet.elements (procedure equ) ;;
+
+(* - pour chaque solution de la base on creer une nouvelle variable 
+     ET on lui associe sa variable purifie corespondante *)
+let assocvar l1 l2 r =
+  let rec assoc_Var l1 l2 r i = match r with
+    | [] -> []
+    | h::tl ->
+       let rec aux l v i = match l, v with
+	 | [],[] -> []
+	 | h1::tl1, h2::tl2 ->
+	  begin
+	    match h1, h2 with
+	      Elem(_, var), m -> ( var , [ Elem(m, var_auto "_v" i) ] ) :: aux tl1 tl2 i
+	  end
+	 | _ -> failwith "impossible" 
+       in
+       match h with
+	 VectMod.Vect(v1, v2) ->
+	 aux l1 v1 i @ aux l2 v2 i @ assoc_Var l1 l2 tl (i+1)
+  in
+  assoc_Var l1 l2 r 1;;
+
+(* - on fusionne les element qui on la meme variable purifier en reunissant les nouvelle variable correspondante *)
+let merge l = 
+  let rec merge' l1 l2 = match l1, l2 with
+    | [], [] -> []
+    | l1', [] -> l1'
+    | [], l2' -> l2'
+    | h1::tl1, h2::tl2 ->
+       
+       match h1, h2 with
+	 (e1, a), (e2, b) ->
+	 if compare_term e1 e2 = -1 then
+	   h1 :: merge' tl1 (h2::tl2)
+	 else if compare_term e1 e2 = 1 then
+	   h2 :: merge' (h1::tl1) tl2
+	 else (e1, a @ b) :: merge' tl1 tl2
+  in
+  let cut l =
+    let rec scinde' l r n = match l, n with
+      | _, 0 -> r, l
+      | h::tl, _ -> scinde' tl (r @ [h]) (n-1)
+      | _ -> failwith "error"
+    in
+    (scinde' l [] ((List.length l)/2))
+  in
+  let rec merge_rec l =
+    let r = cut l in
+    let e1 = fst r in
+    let e2 = snd r in
+    let le1 = List.length e1 in
+    let le2 = List.length e2 in
+    if (le1 > 1) || (le2 > 1) then
+      merge' (merge_rec e1) (merge_rec e2)
+    else merge' e1 e2
+  in
+  merge_rec l;;
+    
+(* - enfin, on pour chaque variable associe est associe une liste de nouvelle variable *)
+(* On creer un symbole AC pour cette liste *)
+let rec buildAC l = match l with
+  | [] -> []
+  | (var, l') :: tl -> (var, mk_SymbAC2 {name="+"} (mk_Multiset2 l')) :: fff tl;;
+
+(* - on construit maintenant la substitution *)
+let purifylist_to_assocvar l1 l2 =
+  let r = solve_dioph l1 l2 in
+  let l = assocvar l1 l2 r in
+  let l = List.sort (fun x y -> match x, y with (e1, _), (e2, _) -> compare_term e1 e2) l in
+  let l = merge l in
+  let l = buildAC l in
+  si_of_list l;;
+  
   
 (**** Procedure d'unification ****)
 
