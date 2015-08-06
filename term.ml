@@ -1,3 +1,4 @@
+#load "multi_set.cmo";;
 open Multi_set;;
 
 (**** Les types ****)
@@ -83,9 +84,11 @@ let mk_SymbAC s args =
       match h with
       | SymbAC(s', v) when s = s' -> aux2 s (fusion compare_term ms v) tl 
       | _ -> assert false
-  in 
-  let ms = mk_Multiset compare_term (List.sort compare_term (fst r)) in
-  SymbAC( s, aux2 s ms (snd r) );;
+  in
+  if List.length args = 1 then List.hd args
+  else
+    let ms = mk_Multiset compare_term (List.sort compare_term (fst r)) in
+    SymbAC( s, aux2 s ms (snd r) );;
 
 let mk_SymbAC2 s ms = SymbAC(s, ms);;
 
