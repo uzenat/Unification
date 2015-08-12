@@ -22,6 +22,23 @@ let cmpr_Multiset cmpr ms1 ms2 =
   match ms1, ms2 with
     Multiset l1, Multiset l2 -> aux cmpr l1 l2;;
 
+let diff cmpr ms1 ms2 =
+  let rec aux cmpr l1 l2 = match l1, l2 with
+    | [], [] -> []
+    | [], l2' -> []
+    | l1', [] -> l1'
+    | h1::tl1, h2::tl2 ->
+      match h1, h2 with
+	Elem( m1, v1), Elem( m2, v2) ->
+        if cmpr v1 v2 = -1 then h1 :: aux cmpr tl1 (h2::tl2)
+        else if cmpr v1 v2 = 1 then aux cmpr (h1::tl1) tl2
+        else if m1 <= m2 then aux cmpr tl1 tl2
+        else Elem(m1-m2, v1) :: aux cmpr tl1 tl2
+  in
+  match ms1, ms2 with
+    Multiset l1, Multiset l2 ->
+      Multiset (aux cmpr l1 l2);;
+
 let fusion cmpr ms1 ms2 =
   let rec aux cmpr l1 l2 = match l1, l2 with
     | [], [] -> []

@@ -130,3 +130,9 @@ let procedure equ =
   let p1 = init_P1 equ in
   let um = VectSet.empty in
   step p1 um equ ;;
+
+
+let equ = mk_Equat [1 ; 1 ; 1] [1; 1];;
+
+VectSet.elements (procedure equ);;
+

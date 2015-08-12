@@ -1,34 +1,22 @@
 #load "multi_set.cmo";;
 #load "term.cmo";;
 #load "diophantienne.cmo";;
-open Multi_set
+open Multi_set;;
 open Term;;
 open Diophantienne;;
 
   
 (**** Supression des termes identiques de deux listes ****)
 
-  
-let remove_term l1 l2 = 
-  let rec remove_term1 m t l lres = match l with
-    | [] -> [ Elem(m, t) ], lres
-    | Elem(m', v') :: tl ->
-       if eq t v' then
-	 let new_m = m - m' in
-	 let new_m' = m' - m in
-	 let r1 = if new_m <= 0 then [] else [ Elem(new_m, t) ] in
-	 let r2 = if new_m' <= 0 then (lres @ tl) else lres @ [ Elem(new_m', t) ] @ tl in
-	 r1, r2
-       else remove_term1 m t tl (lres @ [Elem(m', v')])
-  in
-  let rec remove_term2 l1 l2 lres = match l1 with
-    | [] -> lres, l2
-    | Elem(m, v) ::tl ->
-       let r = remove_term1 m v l2 [] in
-       remove_term2 tl (snd r) (lres @ (fst r))
-  in
-  remove_term2 l1 l2 [];;
 
+
+(* renvoie les deux liste sans les termes en commun *)  
+let remove_term l1 l2 =
+  let ms1 = Multiset l1 in
+  let ms2 = Multiset l2 in
+  let ms1' = Multi_set.diff compare_term ms1 ms2 in
+  let ms2' = Multi_set.diff compare_term ms2 ms1 in
+  let (Multiset l1', Multiset l2') = ms1', ms2' in l1', l2';;
 
   
 (**** Procedure de purification ****)
@@ -46,22 +34,19 @@ let purify l1 l2 =
 	  aux tl (lres @ [Elem(m, mk_Var s.name)]) si i
        | Elem(m, v) ->
 	  let new_key = var_auto "__var__" i in
-	  let new_valr = v in
-	  let si = Si.add new_key new_valr si in
+	  let si = Si.add new_key v si in
 	  aux tl (lres @ [Elem(m, new_key)]) si (i+1)
   in
   let rmv = remove_term l1 l2 in
   let l1 = fst rmv in
   let l2 = snd rmv in
-  let si = Si.empty in
-  let r1 = aux l1 [] si 1 in
+  let r1 = aux l1 [] (Si.empty) 1 in
   let si = fst r1 in
   let lres1 = snd r1 in
   let r2 = aux l2 [] si ( (List.length l1)+1 ) in
   let si = fst r2 in
   let lres2 = snd r2 in
   (si, (lres1, lres2) );;
-
 
   
 (**** Utilisation des equations diophantienne ****)
@@ -78,7 +63,27 @@ let equat_of_purifylist l1 l2 =
  **** On veut, a partir des deux listes purifies, recuperer une substitution ****
  **** qui substitue a chaque variable purife des deux listes                 ****
  **** la somme ponderer des nouvelles variable creer par les solutions de la ****
- **** base de l'equation diophantienne creer a partir des deux listes        ****)
+ **** base de l'equation diophantienne creer a partir des deux listes        ****) 
+
+module A = struct
+  type t = term
+  let compare = compare_term
+end;;
+
+module L =
+struct
+  include Map.Make (A)
+  let update k v m =
+    begin
+      let r =
+        try Some (find k m)
+        with Not_found -> None
+      in
+      match r with
+      | None -> add k [v] m
+      | Some x -> add k (x @ [v]) m
+    end
+end;;
 
 (* - a partir des deux listes purifies, on creer une equation diophantienne
      ET on resoud l'equation diophantienne en generant une base de solutions *)
@@ -89,74 +94,31 @@ let solve_dioph l1 l2 =
 (* - pour chaque solution de la base on creer une nouvelle variable 
      ET on lui associe sa variable purifie corespondante *)
 let assocvar l1 l2 r =
-  let rec assoc_Var l1 l2 r i = match r with
-    | [] -> []
+  let rec aux l1 l2 r map i = match r with
+    | [] -> map
     | h::tl ->
-       let rec aux l v i = match l, v with
-	 | [],[] -> []
-	 | h1::tl1, h2::tl2 ->
-	  begin
-	    match h1, h2 with
-	      Elem(_, var), m -> ( var , [ Elem(m, var_auto "_v" i) ] ) :: aux tl1 tl2 i
-	  end
-	 | _ -> failwith "impossible" 
-       in
-       match h with
-	 VectMod.Vect(v1, v2) ->
-	 aux l1 v1 i @ aux l2 v2 i @ assoc_Var l1 l2 tl (i+1)
+      match h with VectMod.Vect(a, b) ->
+        let rec aux2 p q map i = match p, q with
+          | [], [] -> map
+          | Elem(m1, var)::tl1, m2::tl2 ->
+            if m2 = 0 then
+              aux2 tl1 tl2 map (i+1)
+            else
+              let map' = L.update var (Elem(m2, var_auto "_v" i)) map in
+              aux2 tl1 tl2 map' (i+1)
+          | _ -> failwith "impossible"
+        in
+        let map' = aux2 l1 a map i in
+        let map' = aux2 l2 b map' i in
+        aux l1 l2 tl map' (i+1)
   in
-  assoc_Var l1 l2 r 1;;
-
-(* - on fusionne les element qui on la meme variable purifier en reunissant les nouvelle variable correspondante *)
-let merge l = 
-  let rec merge' l1 l2 = match l1, l2 with
-    | [], [] -> []
-    | l1', [] -> l1'
-    | [], l2' -> l2'
-    | h1::tl1, h2::tl2 ->
-       
-       match h1, h2 with
-	 (e1, a), (e2, b) ->
-	 if compare_term e1 e2 = -1 then
-	   h1 :: merge' tl1 (h2::tl2)
-	 else if compare_term e1 e2 = 1 then
-	   h2 :: merge' (h1::tl1) tl2
-	 else (e1, a @ b) :: merge' tl1 tl2
-  in
-  let cut l =
-    let rec scinde' l r n = match l, n with
-      | _, 0 -> r, l
-      | h::tl, _ -> scinde' tl (r @ [h]) (n-1)
-      | _ -> failwith "error"
-    in
-    (scinde' l [] ((List.length l)/2))
-  in
-  let rec merge_rec l =
-    let r = cut l in
-    let e1 = fst r in
-    let e2 = snd r in
-    let le1 = List.length e1 in
-    let le2 = List.length e2 in
-    if (le1 > 1) || (le2 > 1) then
-      merge' (merge_rec e1) (merge_rec e2)
-    else merge' e1 e2
-  in
-  merge_rec l;;
-    
-(* - enfin, on pour chaque variable associe est associe une liste de nouvelle variable *)
-(* On creer un symbole AC pour cette liste *)
-let rec buildAC l = match l with
-  | [] -> []
-  | (var, l') :: tl -> (var, mk_SymbAC2 {name="+"} (mk_Multiset2 l')) :: fff tl;;
+  (aux l1 l2 r (L.empty) 1);;
+        
 
 (* - on construit maintenant la substitution *)
 let purifylist_to_assocvar l1 l2 =
   let r = solve_dioph l1 l2 in
-  let l = assocvar l1 l2 r in
-  let l = List.sort (fun x y -> match x, y with (e1, _), (e2, _) -> compare_term e1 e2) l in
-  let l = merge l in
-  let l = buildAC l in
-  si_of_list l;;
+  assocvar l1 l2 r
   
   
 (**** Procedure d'unification ****)
@@ -167,15 +129,8 @@ let si = Si.empty;;
 
 let rec unify s t si =
 
-  let s' = match s with
-    | Var _ -> sub_term si s
-    | _ -> s
-  in
-    
-  let t' = match s with
-    | Var _ -> sub_term si t
-    | _ -> t
-  in
+  let s' = sub_term si s in
+  let t' = sub_term si t in
   
   match s', t' with
   | Var v, Var v' when v.name = v'.name -> si
@@ -188,3 +143,78 @@ let rec unify s t si =
      else Si.add s' t' si
   | _ , Var v -> unify t' s' si
   | _ -> assert false;;
+
+
+
+let zero = mk_Symb {name="__zero__" ; arity=0} [];;
+
+let rec list_to_si a l si = match l with
+  | [] -> si
+  | Elem(0, var) :: tl -> list_to_si a tl (Si.add var zero si)
+  | Elem(m, var) :: tl -> list_to_si a tl (Si.add var a si);; 
+
+let rec getSymb lvar lmap = match lvar with
+  | [] -> []
+  | (v, cons) :: tl -> ((v, cons) , L.find v lmap) :: getSymb tl lmap;;
+    
+
+let a = mk_Symb {name="a" ; arity=0} [];;
+let b = mk_Symb {name="b" ; arity=0} [];;
+
+let x = mk_Var "x";;
+let y = mk_Var "y";;
+let z = mk_Var "z";;
+
+let v1 = mk_Var "v1";;
+let v2 = mk_Var "v2";;
+let v3 = mk_Var "v3";;
+
+
+
+Si.bindings (unify a a (Si.empty));;
+
+let ac1 = mk_SymbAC {name="+"} [ x ; x ; y ; a ];;
+let ac2 = mk_SymbAC {name="+"} [ b ; b ; z ];;
+
+let l1 = let (SymbAC (_, Multiset l)) = ac1 in l;;
+let l2 = let (SymbAC (_, Multiset l)) = ac2 in l;;
+
+let r = purify l1 l2;;
+let si = fst r;;
+let l1 = fst (snd r);;
+let l2 = snd (snd r);;
+
+let sol = solve_dioph l1 l2;;
+let assoc = purifylist_to_assocvar l1 l2;;
+L.bindings assoc;;
+let list = getSymb (Si.bindings si) assoc;;
+let f1 = List.hd list;;
+let f2 = List.hd (List.tl list);;
+let zero = (mk_Symb {name="__zero__";arity=0} []) ;;
+
+
+let rec aux2 l si = match l with
+  | [] -> []
+  | Elem(m, v) :: tl -> Elem(m, sub_term si v) :: aux2 tl si
+;;
+let rec algo1 var cons hd0 l si = match l with
+      | [] -> []
+      | hd :: tl ->
+        let aux1 x = match x with Elem(m, v) -> (v, zero) in
+        let hd2 = match hd with Elem(m, v) -> (v, cons) in
+        let tl2 = List.map aux1 tl in
+        let r = hd0 @ [hd2] @ tl2 in
+        let si' = List.fold_right (fun (x,y) -> Si.add x y) r (si) in
+        let value = ( (var, cons) , (si') ) in
+        value :: algo1 var cons (hd0 @ [(fst hd2, zero)]) tl si;;
+
+
+
+let r = algo1 (fst (fst f1)) (snd (fst f1)) [] (snd f1) (Si.empty);;
+
+let f11 = List.hd r;;
+let si11 = snd f11;;
+
+let l2 = snd f2;;
+aux2 l2 si11;;
+algo1 (fst (fst f2)) (snd (fst f2)) [] (snd f2) (Si.empty);;

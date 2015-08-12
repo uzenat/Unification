@@ -1,4 +1,3 @@
-#load "multi_set.cmo";;
 open Multi_set;;
 
 (**** Les types ****)
@@ -26,16 +25,25 @@ type term =
   | Var of var
 
 
+
 (**** Les fonctions ****)
 
+(* definition de la constante null *)
+let null = Symb ({name="@__NULL__@";arity=0}, []);;
+
 (* construit un symbole *)
+exception WrongSymb
 exception WrongArity of symb * int
 let mk_Symb s args =
   let () =
     if List.length args <> s.arity then
       raise (WrongArity(s , List.length args))
+    else if s.name = "@__NULL__@" then
+      raise WrongSymb 
   in
   Symb (s, args);;
+
+
 
 (* construit une variable *)
 let mk_Var s = Var {name=s};;
@@ -69,6 +77,7 @@ let rec is_occurs v t = match t with
   | _ -> assert false;;
 
 (* construit un symbole associatif et commutatif *)
+exception EmptyAC;;
 let mk_SymbAC s args =
   let rec aux l l1 l2 = match l with
     | [] -> l1, l2
@@ -85,7 +94,8 @@ let mk_SymbAC s args =
       | SymbAC(s', v) when s = s' -> aux2 s (fusion compare_term ms v) tl 
       | _ -> assert false
   in
-  if List.length args = 1 then List.hd args
+  if List.length args = 0 then raise EmptyAC
+  else if List.length args = 1 then List.hd args
   else
     let ms = mk_Multiset compare_term (List.sort compare_term (fst r)) in
     SymbAC( s, aux2 s ms (snd r) );;
