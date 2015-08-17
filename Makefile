@@ -1,9 +1,8 @@
-SOURCES=multi_set.ml diophantienne.ml term.ml
+SOURCES=multi_set.ml diophantienne.ml term.ml unify.ml test.ml
 OBJECTS=$(SOURCES:.ml=.cmo)
 INTERFACES=$(SOURCES:.ml=.mli)
 FLAGS=-g
 EXECUTABLE=exec
-
 
 
 compil:

@@ -1,26 +1,43 @@
+(** type symbole simple **)
 type symb = { name : string ; arity : int ; }
+
+(** type symbole AC **)
 type symbAC = { name : string ; }
+
+(** type variable **) 
 type var = { name : string ; }
 
+(** definition d'un terme **)
 type term =
-    private
-	 | Symb of symb * term list
-	 | SymbAC of symbAC * term Multi_set.ms
-	 | Var of var
-
-			   
+  private
+  | Symb of symb * term list
+  | SymbAC of symbAC * term Multi_set.ms
+  | Var of var
+      
+(** exception **)			   
 exception WrongArity of symb * int
-val mk_Symb : symb -> term list -> term
-val mk_SymbAC : symbAC -> term list -> term
-val mk_SymbAC2 : symbAC -> term Multi_set.ms -> term
+exception CantPurify
 
+(** construit un terme simple **)
+val mk_Symb : symb -> term list -> term
+
+(** construit un terme AC **)
+val mk_SymbAC : symbAC -> term list -> term
+
+(** construit une variable **)
 val mk_Var : string -> term
-  
+
+(** retourne la chaine de caractere du terme **)
+val string_of_term : term -> string
+
+(** test l'egalite de deux termes **)
 val eq : term -> term -> bool
 
+(** compare deux termes **)
 val compare_term : term -> term -> int
 val is_occurs : term -> term -> bool
 
+(** module de substitution **)
 module AssocMap : sig type t = term val compare : term -> term -> int end
 module Si :
   sig
@@ -52,6 +69,20 @@ module Si :
     val map : ('a -> 'b) -> 'a t -> 'b t
     val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
   end
-    
+
+(** substition dans un terme **)
 val sub_term : Si.key Si.t -> Si.key -> Si.key
-val si_of_list : (Si.key * 'a) list -> 'a Si.t
+
+val sub_si : Si.key Si.t -> Si.key Si.t -> Si.key Si.t
+
+(** tranforme la substitution en chaine de caractere **)
+val string_of_si : term Si.t -> string
+
+val fusion_si : 'a Si.t -> 'a Si.t -> 'a Si.t
+
+val diff_si : 'a Si.t -> 'b Si.t -> 'a Si.t
+
+val eq2 : Si.key Si.t -> Si.key -> Si.key -> bool
+
+(** purification de deux terme AC **)
+val purify : term -> term -> term Si.t * (term * term)

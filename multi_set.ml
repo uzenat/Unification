@@ -1,9 +1,12 @@
+(* definition des types *)
 type 'a elem = Elem of int * 'a;;
 type 'a ms = Multiset of 'a elem list;;
 
+(* renvoie la taille d'un multiset *)
 let len_Multiset ms = match ms with
     Multiset l -> List.length l;;
 
+(* compare deux multiset *)
 let cmpr_Multiset cmpr ms1 ms2 =
   let rec aux cmpr l1 l2 = match l1, l2 with
     | [], [] -> 0
@@ -22,6 +25,7 @@ let cmpr_Multiset cmpr ms1 ms2 =
   match ms1, ms2 with
     Multiset l1, Multiset l2 -> aux cmpr l1 l2;;
 
+(* renvoie ms1 sans les element appartenant a ms2 *)
 let diff cmpr ms1 ms2 =
   let rec aux cmpr l1 l2 = match l1, l2 with
     | [], [] -> []
@@ -37,8 +41,13 @@ let diff cmpr ms1 ms2 =
   in
   match ms1, ms2 with
     Multiset l1, Multiset l2 ->
-      Multiset (aux cmpr l1 l2);;
+    Multiset (aux cmpr l1 l2);;
 
+(* renvoie deux multiset tel qu'il n'ont aucun element commun *)
+let del_same cmpr ms1 ms2 =
+  (diff cmpr ms1 ms2, diff cmpr ms2 ms1);;
+
+(* fusionne de multiset *)
 let fusion cmpr ms1 ms2 =
   let rec aux cmpr l1 l2 = match l1, l2 with
     | [], [] -> []
@@ -55,6 +64,7 @@ let fusion cmpr ms1 ms2 =
     Multiset l1, Multiset l2 ->
       Multiset (aux cmpr l1 l2);;
 
+(* scinde une liste *)
 let scinde l =
   let rec scinde' l r n = match l, n with
     | _, 0 -> r, l
@@ -78,6 +88,7 @@ let rec fusion_rec cmpr l =
     fusion cmpr (fusion_rec cmpr e1) (fusion_rec cmpr e2)
   else fusion cmpr e1 e2;;
 
+(* Construit un multiset a partir d'une liste d'element *)
 let mk_Multiset cmpr l =
   let rec aux l = match l with
     | [] -> []
@@ -85,10 +96,11 @@ let mk_Multiset cmpr l =
   in
   fusion_rec cmpr (Multiset(aux l));;
 
-let mk_Multiset2 l =
-  let rec aux l = match l with
-    | [] -> []
-    | Elem(0, v) :: tl -> aux tl
-    | h::tl -> h:: aux tl
+(* retourne une liste d'element a partir d'un multiset *)
+let list_of_multiset ms =
+  let (Multiset l) = ms in
+  let rec multiply e = match e with
+    | Elem(0, _) -> []
+    | Elem(m, v) -> v :: multiply (Elem(m-1, v))
   in
-  Multiset(aux l);;
+  List.flatten (List.map multiply l);;

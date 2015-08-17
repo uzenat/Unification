@@ -34,4 +34,26 @@ module VectSet :
     val find : elt -> t -> elt
     val of_list : elt list -> t
   end
+val canonique : int -> int -> int list
+val somme : VectMod.t -> VectMod.t -> VectMod.t
+val d : VectMod.t -> equat -> int
+val mk_Vect_g : int -> equat -> VectMod.t
+val mk_Vect_d : int -> equat -> VectMod.t
+val eq_Vect : VectMod.t -> VectMod.t -> bool
+val plus_grand' : 'a list -> 'a list -> bool
+val plus_grand : VectMod.t -> VectMod.t -> bool
+val not_plus_grand : VectMod.t -> VectMod.t -> bool
+val is_minimal_in : VectMod.t -> VectSet.t -> bool
+val q1 : VectMod.t list -> int -> equat -> VectMod.t list
+val q2 : VectMod.t list -> int -> equat -> VectMod.t list
+val fq : VectMod.t list -> equat -> VectMod.t list
+val ensemble_Qk : VectSet.t -> equat -> VectSet.t
+val fm : VectSet.t -> equat -> VectSet.t
+val ensemble_Mk : VectSet.t -> equat -> VectSet.t
+val fp : VectSet.t -> VectSet.t -> VectSet.t
+val ensemble_Pk : VectSet.t -> VectSet.t -> VectSet.t
+val init_P1 : equat -> VectSet.t
+val step_kp1 : VectSet.t -> VectSet.t -> equat -> VectSet.t * VectSet.t
+val step : VectSet.t -> VectSet.t -> equat -> VectSet.t
 val procedure : equat -> VectSet.t
+val equ : equat
