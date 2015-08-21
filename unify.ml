@@ -1,12 +1,10 @@
-
-#load "multi_set.cmo";;  
-#load "term.cmo";;  
-#load "diophantienne.cmo";;  
-
-
 open Multi_set;;
 open Term;;
 open Diophantienne;;
+
+(*  #load "multi_set.cmo";;  *)
+(*  #load "term.cmo";;  *)
+(* #load "diophantienne.cmo";; *)
 
   
   
@@ -15,6 +13,7 @@ open Diophantienne;;
  **** qui substitue a chaque variable purife des deux listes                 ****
  **** la somme ponderer des nouvelles variable creer par les solutions de la ****
  **** base de l'equation diophantienne creer a partir des deux listes        ****) 
+
 
 module A = struct
   type t = term
@@ -48,7 +47,7 @@ let solve_dioph ac1 ac2 =
     let aux e = let (Elem(m, _)) = e in m in
     let aux2 l = Coefficient (List.map aux l) in
     Equation(aux2 l1, aux2 l2)
-  | _ -> failwith "error : Not AC term"
+  | _ -> failwith "Error : solv_dioph"
   in
   let equ = equat_of_purifylist ac1 ac2 in
   VectSet.elements (procedure equ) ;;
@@ -105,254 +104,247 @@ let si = Si.empty;;
 (* Renvoi un  unificateur (le premier) de s et t *)
 let rec unify s t si =
 
-  let (s, t) = match s, t with
-    | Var _, Var _ ->
-      (sub_term si s, sub_term si t)
-    | Var _ , _ ->
-      (sub_term si s, t)
-    | _, Var _ ->
-      (s, sub_term si t)
-    | _ -> s, t
-  in
+  let (s, t) = (sub_term si s, sub_term si t) in
 
-  match s, t with
+  if eq s t then [ si ]
+  else
 
-  (* Unification de deux variables egal *)
-  | Var v, Var v' when v.name = v'.name -> si
+    begin
 
-  (* Unification de deux symbols *)
-  | Symb(v, args), Symb(v', args') ->
-    if v.name = v'.name && v.arity = v'.arity then
-      List.fold_left2 (fun a b c -> unify b c a) si args args'
-    else begin raise SymbolClash end
+      
+      if (is_occurs s t) || (is_occurs t s) then raise OccursCheck
+      else
 
-  (* Unification d'une variable avec un term *)
-  | Var v, _ ->
-    if is_occurs s t then begin raise OccursCheck end
-    else Si.add s t si
+        
 
-  (* Unification d'un term avec une variable *)
-  | _ , Var v -> unify t s si
+      match s, t with
 
-  (* Unification d'un symbol simple avec un symbol AC *)
-  | Symb(_, _), SymbAC(_, _) -> begin raise SymbolClash end
+      (* Unification de deux variables egal *)
+      | Var v, Var v' when v.name = v'.name -> [ si ]
 
-  (* Unification d'un symbol AC avec un symbol simple *)
-  | SymbAC(_, _), Symb(_, _) -> begin raise SymbolClash end
+      (* Unification de deux symbols *)
+      | Symb(v, args), Symb(v', args') ->
+        if v.name = v'.name && v.arity = v'.arity then
+          let f = fun x y z -> match unify y z x with h::tl -> h | _ -> Si.empty in
+          [ List.fold_left2 f si args args' ]
+        else begin raise SymbolClash end
 
-  (* Unification de deux symbol AC --> algo unification modulo AC *)
-  | ac1, ac2 -> 
+      (* Unification d'une variable avec un term *)
+      | Var v, _ ->
+        if is_occurs s t then begin raise OccursCheck end
+        else [ Si.add s t si ]
 
-    let put_voidAC ac si = match ac with
-      | SymbAC(s, Multiset args) ->
-        let rec put_voidAC' l si s = match l with
-          | [] -> si
-          | Elem(m, Var v) :: tl when (v.name.[0] = '_') ->
-            put_voidAC' tl (Si.add (mk_Var v.name) (mk_SymbAC {name=s} []) si) s
-          | _ :: tl -> put_voidAC' tl si s
-        in
-        put_voidAC' args si s.name
-      | _ -> failwith "Error : not AC term"
-    in
+      (* Unification d'un term avec une variable *)
+      | _ , Var v -> unify t s si
 
-    let permut_list ac si = match ac with
-      | ( (var, cons), SymbAC(s, Multiset l) ) ->
-        let rec algo1 var cons hd0 l si = match l with
-          | [] -> []
-          | hd :: tl ->
-            let aux1 x = let Elem(m, v) = x in (v, mk_SymbAC s []) in
-            let hd2 = let Elem(m, v) = hd in (v, cons) in
-            let tl2 = List.map aux1 tl in
-            let r = hd0 @ [hd2] @ tl2 in
-            let si' = List.fold_right (fun (x,y) -> Si.add x y) r (si) in
-            let value = ( (var, cons) , (si') ) in
-            value :: algo1 var cons (hd0 @ [(fst hd2, mk_SymbAC s [])]) tl si
-        in
-        algo1 var cons [] l si 
-      | _ -> failwith "Error : not AC term"
-    in
+      (* Unification d'un symbol simple avec un symbol AC *)
+      | Symb(_, _), SymbAC(_, _) -> begin raise SymbolClash end
 
-    let is_unifiable s t si =
-      try
-        Some (unify s t si)
-      with _ -> None
-    in
+      (* Unification d'un symbol AC avec un symbol simple *)
+      | SymbAC(_, _), Symb(_, _) -> begin raise SymbolClash end
 
-    let notonlyVi_in ac = match ac with
-      | SymbAC(s, Multiset l) ->
-        List.exists (fun x -> match x with | Elem(_, Var s) when (s.name.[0] = '_') -> false | _ -> true) l
-      | _ -> failwith "Error : no AC term"
-    in
+      (* Unification de deux symbol AC --> algo unification modulo AC *)
+      | SymbAC _, SymbAC _ ->
 
 
-    (* place les element de si' dans si *)
-    let rec fusion_si2 si si' =
-      let rec aux si l = match l with
-        | [] -> si
-        | (k, h) :: tl ->
-          begin
-            match (try Some (Si.find k si) with _ -> None) with
-            | None ->
-              begin
-                match (try Some (Si.find h si) with _ -> None) with
-                | None -> aux (Si.add k h si) tl
-                | Some h' -> aux (Si.add k h' si) tl
-              end
-            | Some s ->
-              begin
-                match (try Some (unify h s (Si.empty)) with _ -> None) with
-                | None -> raise SymbolClash
-                | Some s' -> aux (fusion_si2 si s') tl
-              end
-          end
-      in
-      aux si (Si.bindings si')
-    in
+        (* procedure pour l'unification modulo ac *)
+        let rec unifyAC l sigma real_sigma = match l with
+          | [] -> 
+            let r = sub_si sigma real_sigma in
+            Some [ r ]
+          | h :: tl ->
 
-    let rec algo2 l sigma real_sigma = match l with
-      | [] -> Some [ sub_si sigma real_sigma ]
-      | h :: tl ->
+            let var = fst (fst h) in
+            let sym = snd (fst h) in
 
-        let var = fst (fst h) in
-        let sym = snd (fst h) in
+            let sum = sub_term sigma (snd h) in
+            let sum = sub_term real_sigma sum in
+            let sym = sub_term real_sigma sym in
 
-        let sum = sub_term sigma (snd h) in
-        let sum = sub_term real_sigma (sum) in
+(*
+            let () =
+              print_endline "******************************************************";
+              print_endline ((string_of_term sym) ^ " = " ^ (string_of_term sum) ^ ", " ^ (string_of_term (snd (fst h))));
+              print_endline (string_of_si (real_sigma));
+              print_endline "******************************************************";
+            in
+*)
+           if eq s t then unifyAC tl sigma real_sigma
+            else
 
-        match sym, sum with
-        | Var s, _ when (s.name.[0] = '_') ->
-          let sigma' = Si.add sym sum sigma in
-          algo2 tl sigma' real_sigma
-        | Var s, Var t when (t.name.[0] = '_') ->
-          let sigma' = Si.add sum sym sigma in
-          algo2 tl sigma' real_sigma
-        | Var s, Var t ->
-          begin
-            match (try Some (Si.find sym real_sigma) with _ -> None) with
-            | None ->
-              begin
-                match (try Some (Si.find sum real_sigma) with _ -> None) with
-                | None ->
-                  let real_sigma' = Si.add sym sum real_sigma in
-                  algo2 tl sigma real_sigma'
-                | Some sum' ->
-                  let real_sigma' = Si.add sym sum' real_sigma in
-                  algo2 tl sigma real_sigma'
-              end 
-            | Some sum' ->
-              let real_sigma' = Si.add sum sum' real_sigma in
-              algo2 tl sigma real_sigma'
-          end
-        | Var s, Symb(_, _) ->
-          if is_occurs sym sum then None
-          else
-            begin
-              match (try Some (Si.find sym real_sigma) with _ -> None) with
-              | None ->
-                let real_sigma' = Si.add sym sum real_sigma in
-                algo2 tl sigma real_sigma'
-              | Some sum' ->
+            match sym, sum with
+
+            | Var s, _ when (s.name.[0] = '_') ->
+              print_endline "NE RENTRE JAMAIS";
+
+              if is_occurs sym sum then None
+              else
                 begin
-                  match sum' with
-                  | Var ss ->
-                    let real_sigma' = Si.add sum' sum real_sigma in
-                    algo2 tl sigma real_sigma'
-                  | _ ->
-                    begin
-                      match (try Some (unify sum sum' (Si.empty)) with _ -> None) with
-                      | None -> None
-                      | Some ss' -> algo2 tl sigma (fusion_si real_sigma ss')
-                    end
+                  let sigma' = Si.add sym sum sigma in
+                  unifyAC tl sigma' real_sigma
                 end
-            end
-        | Var s, SymbAC (ss, ms) when (notonlyVi_in sum) ->
-          let new_sigma  = put_voidAC sum (sigma) in
-          let new_sum = sub_term new_sigma sum in
-          let sigma' = (try Some (unify sym new_sum (Si.empty)) with _ -> None) in
-          begin
-            match sigma' with
-            | None -> None
-            | Some s' ->
-              try algo2 tl new_sigma (fusion_si2 real_sigma s')
-              with _ -> None
-          end
-        | Var s, SymbAC (ss, ms)->
-          let permut = permut_list ((var,sym), sum) sigma in
-          let permut = List.filter (fun ((k,v),si) -> match (is_unifiable v (sub_term si sum) (Si.empty)) with None -> false | _ -> true) permut in
-          let aux some x =
-            let r = (algo2 tl (let (_,si) = x in si)) real_sigma in
-            match r, some with
-            | None, None -> None
-            | Some s, None -> Some s
-            | None , Some s' -> Some s'
-            | Some s, Some s' -> Some (s @ s')
-          in
-          List.fold_left aux None permut
-        | Symb(s, args), Var t when (t.name.[0] = '_') ->
-          let sigma' = Si.add sum sym sigma in
-          algo2 tl sigma' real_sigma
-        | Symb(s, args), Var t ->
-          begin
-            match (try Some (Si.find sum real_sigma) with _ -> None) with
-            | None ->
-              let real_sigma' = Si.add sum sym real_sigma in
-              algo2 tl sigma real_sigma'
-            | Some sym' ->
+                
+            | _, Var t when (t.name.[0] = '_') ->
+                            
+              if is_occurs sum sym then None
+              else
+                begin
+                  if sym = (sub_term sigma sum) then print_endline "NE RENTRE JAMAIS"
+                  else ();
+                  let sigma' = Si.add sum sym sigma in
+                  unifyAC tl sigma' real_sigma
+                end
+
+            | _ , SymbAC (_, Multiset []) -> None
+      
+            | _ , SymbAC _ when (notonlyVi_in sum) ->
+              let new_sigma  = put_voidAC sum (sigma) in
+              let new_sum = sub_term new_sigma sum in
+              let sigma' = (try Some (unify sym new_sum real_sigma) with _ -> None) in
               begin
-                match sym' with
-                | Var ss ->
-                  let real_sigma' = Si.add sym' sym real_sigma in
-                  algo2 tl sigma real_sigma'
-                | _ ->
-                  begin
-                    match (try Some (unify sym sym' (Si.empty)) with _ -> None) with
-                    | None -> None
-                    | Some ss' -> algo2 tl sigma (fusion_si real_sigma ss')
-                  end
+                match sigma' with
+                | None -> None
+                | Some s' -> unifyAC tl new_sigma (List.hd s') 
               end
-          end
 
-        | Symb(s, _), Symb(t, _) ->
+            | _ , SymbAC (_, _) ->
+              let permut = permut_list ((var,sym), sum) sigma in
+              let permut = List.filter (fun ((k,v),si) -> eq sym (sub_term si sum)) permut in
+
+              let aux some x =
+                let r = (unifyAC tl (let (_,si) = x in si)) real_sigma in
+                match r, some with
+                | None, None -> None
+                | _, None -> r
+                | None , _ -> some
+                | Some s, Some s' -> Some (s @ s')
+
+
+              in
+              List.fold_left aux None permut
+
+            | (Var _, _ | _, Var _ | Symb _, _) ->
+
+              begin
+                match (try Some (unify sym sum real_sigma) with _ -> None) with
+                | None -> None
+                | Some new_sigma ->
+                  let ns = List.hd new_sigma in
+                  unifyAC tl sigma (ns) 
+              end
+
+            | SymbAC _, _ -> failwith "Error"
+              
+        in
+        
+        let t = purify s t in
+        let ac1 = fst (snd t) in
+        let ac2 = snd (snd t) in
+        match ac1, ac2 with
+        | SymbAC _, SymbAC _ ->
           begin
-            let sigma' = (try Some (unify sym sum (Si.empty)) with _ -> None) in
-            match sigma' with
-            | None -> None
-            | Some new_sigma ->
-              algo2 tl sigma real_sigma
+            let si1 = fst t in
+            let si2 = purifyac_to_assocvar ac1 ac2 in
+            let list = getSymb si1 si2 in
+            let dif = diff_si si2 si1 in
+            let list = list @ (getVar dif) in
+            match (unifyAC list (Si.empty) si) with
+            | None -> failwith "Pas unifiable"
+            | Some s -> List.map (fun x -> sub_si x x) s
           end
-        | Symb(_,_), SymbAC (ss, ms) when (notonlyVi_in sum) ->
-          let new_sigma  = put_voidAC sum (sigma) in
-          let new_sum = sub_term new_sigma sum in
-          let sigma' = (try Some (unify sym new_sum (Si.empty)) with _ -> None) in
-          begin
-            match sigma' with
-            | None -> None
-            | Some s' -> algo2 tl new_sigma (fusion_si real_sigma s')
-          end
-        | Symb(_,_), SymbAC (_, _) ->
-          let permut = permut_list ((var,sym), sum) sigma in
-          let permut = List.filter (fun ((k,v),si) -> match (is_unifiable v (sub_term si sum) (Si.empty)) with None -> false | _ -> true) permut in
-          let aux some x =
-            let r = (algo2 tl (let (_,si) = x in si)) real_sigma in
-            match r, some with
-            | None, None -> None
-            | Some s, None -> Some s
-            | None , Some s' -> Some s'
-            | Some s, Some s' -> Some (s @ s')
-          in
-          List.fold_left aux None permut          
-        | _ -> failwith (" " ^ (string_of_term sym) ^ " = " ^ (string_of_term sum))
-    in
+        | _ ->
+          let si1 = fst t in
+          let ac1 = sub_term si1 ac1 in
+          let ac2 = sub_term si1 ac2 in
+          unify ac1 ac2 si
+    end;;
 
-    let t = purify ac1 ac2 in
-    let ac1 = fst (snd t) in
-    let ac2 = snd (snd t) in
-    let si1 = fst t in
-    let si2 = purifyac_to_assocvar ac1 ac2 in
-    let list = getSymb si1 si2 in
-    let dif = diff_si si2 si1 in
-    let list = list @ (getVar dif) in
 
-    let res = match (algo2 list (Si.empty) (Si.empty)) with None -> failwith "Pas unifiable" | Some s -> s in
 
-    List.hd (List.map (fun x -> sub_si x x) res);;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+let x = mk_Var "x";;
+let x1 = mk_Var "x1";;
+let x2 = mk_Var "x2";;
+let x3 = mk_Var "x3";;
+let x4 = mk_Var "x4";;
+let x5 = mk_Var "x5";;
+let x6 = mk_Var "x6";;
+let x7 = mk_Var "x7";;
+let x8 = mk_Var "x8";;
+let x9 = mk_Var "x9";;
+
+let y = mk_Var "y";;
+let z = mk_Var "z";;
+let t = mk_Var "t";;
+let u = mk_Var "u";;
+let w = mk_Var "w";;
+
+let a = mk_Symb {name="a" ; arity=0}  []
+let a1 = mk_Symb {name="a1" ; arity=0}  []
+let a2 = mk_Symb {name="a2" ; arity=0}  []
+let a3 = mk_Symb {name="a3" ; arity=0}  []
+let a4 = mk_Symb {name="a4" ; arity=0}  []
+
+let b = mk_Symb {name="b" ; arity=0}  []
+let b1 = mk_Symb {name="b1" ; arity=0}  []
+let b2 = mk_Symb {name="b2" ; arity=0}  []
+let b3 = mk_Symb {name="b3" ; arity=0}  []
+let b4 = mk_Symb {name="b4" ; arity=0}  []
+
+let c = mk_Symb {name="c" ; arity=0}  []
+let c1 = mk_Symb {name="c1" ; arity=0}  []
+let c2 = mk_Symb {name="c2" ; arity=0}  []
+let c3 = mk_Symb {name="c3" ; arity=0}  []
+let c4 = mk_Symb {name="c4" ; arity=0}  []
+
+let d = mk_Symb {name="d" ; arity=0}  []
+let d1 = mk_Symb {name="d1" ; arity=0}  []
+let d2 = mk_Symb {name="d2" ; arity=0}  []
+let d3 = mk_Symb {name="d3" ; arity=0}  []
+let d4 = mk_Symb {name="d4" ; arity=0}  []
+
+let e = mk_Symb {name="e" ; arity=0}  []
+let e1 = mk_Symb {name="e1" ; arity=0}  []
+let e2 = mk_Symb {name="e2" ; arity=0}  []
+let e3 = mk_Symb {name="e3" ; arity=0}  []
+let e4 = mk_Symb {name="e4" ; arity=0}  []
+
+let f x = mk_Symb {name="f" ; arity=1}  [x]
+let g x = mk_Symb {name="g" ; arity=1}  [x]
+
+
+
+let plus s = mk_SymbAC {name="+"} s;;
+let moins s = mk_SymbAC {name="-"} s;;
+let fois s = mk_SymbAC {name="."} s;;
+
+
+
+let test s t  =
+ 
+  let t1 = Sys.time () in
+  let u = unify s t (Si.empty) in
+  let t2 = Sys.time () in
+  let u = List.map (fun x -> sub_si x x) u in
+  let nf = List.filter (fun x -> not (eq2 x s t)) u in
+  print_endline ((string_of_term s) ^ " = " ^ (string_of_term t));
+  print_endline ("Temps : " ^ (string_of_float ((-.) t2 t1)));
+  print_endline ("Nombre de resultat : " ^ (string_of_int(List.length u)));
+  print_endline ("Nombre de resultat faux : " ^ (string_of_int (List.length nf)));
+  List.iter (fun x -> print_endline (string_of_si x)) nf;
+  print_endline "";;

@@ -84,5 +84,11 @@ val diff_si : 'a Si.t -> 'b Si.t -> 'a Si.t
 
 val eq2 : Si.key Si.t -> Si.key -> Si.key -> bool
 
+val put_voidAC : term -> term Si.t -> term Si.t
+
+val permut_list : ('a * term) * term -> term Si.t -> (('a * term) * term Si.t) list
+
+val notonlyVi_in : term -> bool
+
 (** purification de deux terme AC **)
 val purify : term -> term -> term Si.t * (term * term)

@@ -5,14 +5,19 @@ FLAGS=-g
 EXECUTABLE=exec
 
 
+$(EXECUTABLE): compil
+	ocamlopt -o $(EXECUTABLE) $(SOURCES)
+
 compil:
-	ocamlc -c $(INTERFACES)		
-	ocamlc -c $(SOURCES)
+	ocamlopt -c $(INTERFACES)		
+	ocamlopt -c $(SOURCES)
 
 clean:
 	rm -f *~
-	rm -f *cmi
-	rm -f *cmo
+	rm -f *.cmo
+	rm -f *.cmx
+	rm -f *.cmi
+	rm -f *.o
 	rm -f $(EXECUTABLE)
 
 

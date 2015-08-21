@@ -1,7 +1,6 @@
 open Multi_set;;
 
 
-
 (**** Les types ****)
 
 (* definiton d'un symbol *)
@@ -91,9 +90,11 @@ let eq t1 t2 = (compare_term t1 t2) = 0;;
 
 (* test si une variable v est contenue dans un terme t *)
 let rec is_occurs v t = match t with
-  | Symb(s, args) -> List.exists (is_occurs v) args
+  
+  | Symb(_, args) -> List.exists (is_occurs v) args
   | Var _ -> eq v t
   | SymbAC(s, Multiset l) -> List.exists (fun x -> let (Elem(m, t')) = x  in (is_occurs v t') ) l;;
+
 
 (* construit un symbole associatif et commutatif *)
 let mk_SymbAC s args =
@@ -119,6 +120,7 @@ let mk_SymbAC s args =
   match l with
   | Multiset [Elem(1, a)] -> a
   | _ -> SymbAC(s, l);;
+
 
 
 
@@ -174,6 +176,41 @@ let diff_si si1 si2 =
 
 (* test si t1 et t2 sont egaux a une substitution pres *) 
 let eq2 si t1 t2 = eq (sub_term si t1) (sub_term si t2);;
+
+(* Renvoie une substitution avec toutes les variable special associe a +[] *)
+let put_voidAC ac si = match ac with
+      | SymbAC(s, Multiset args) ->
+        let rec put_voidAC' l si s = match l with
+          | [] -> si
+          | Elem(m, Var v) :: tl when (v.name.[0] = '_') ->
+            put_voidAC' tl (Si.add (mk_Var v.name) (mk_SymbAC s []) si) s
+          | _ :: tl -> put_voidAC' tl si s
+        in
+        put_voidAC' args si s
+      | _ -> failwith "Error : put_voidAC";;
+
+(* Renvoie une liste avec toutes les subsitutions de permutation *)
+let permut_list ac si = match ac with
+  | ( (var, cons), SymbAC(s, Multiset l) ) ->
+    let rec algo1 var cons hd0 l si = match l with
+      | [] -> []
+      | hd :: tl ->
+        let aux1 x = let Elem(m, v) = x in (v, mk_SymbAC s []) in
+        let hd2 = let Elem(m, v) = hd in (v, cons) in
+        let tl2 = List.map aux1 tl in
+        let r = hd0 @ [hd2] @ tl2 in
+        let si' = List.fold_right (fun (x,y) -> Si.add x y) r (si) in
+        let value = ( (var, cons) , (si') ) in
+        value :: algo1 var cons (hd0 @ [(fst hd2, mk_SymbAC s [])]) tl si
+    in
+    algo1 var cons [] l si 
+  | _ -> failwith "Error : permut_list";;
+
+(* test si ac contient au moin un term qui n'est pas une variable speciale *)
+let notonlyVi_in ac = match ac with
+      | SymbAC(s, Multiset l) ->
+        List.exists (fun x -> match x with | Elem(_, Var s) when (s.name.[0] = '_') -> false | _ -> true) l
+      | _ -> failwith "Error :  notonlyVi_in";;
 
 
 

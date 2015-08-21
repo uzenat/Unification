@@ -45,4 +45,4 @@ exception OccursCheck
 val si : 'a Term.Si.t
 val unify :
   Term.Si.key ->
-  Term.Si.key -> Term.Si.key Term.Si.t -> Term.Si.key Term.Si.t
+  Term.Si.key -> Term.Si.key Term.Si.t -> Term.Si.key Term.Si.t list
