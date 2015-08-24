@@ -2,8 +2,8 @@ open Multi_set;;
 open Term;;
 open Diophantienne;;
 
-(*  #load "multi_set.cmo";;  *)
-(*  #load "term.cmo";;  *)
+(* #load "multi_set.cmo";; *)
+(* #load "term.cmo";; *)
 (* #load "diophantienne.cmo";; *)
 
   
@@ -125,8 +125,22 @@ let rec unify s t si =
       (* Unification de deux symbols *)
       | Symb(v, args), Symb(v', args') ->
         if v.name = v'.name && v.arity = v'.arity then
-          let f = fun x y z -> match unify y z x with h::tl -> h | _ -> Si.empty in
-          [ List.fold_left2 f si args args' ]
+          let rec aux l1 l2 si' = match l1, l2 with
+            | [], [] -> [ si' ]
+            | ([], _ | _, []) -> failwith "Error: unify"
+            | h1 :: tl1 , h2 :: tl2 ->
+              let rec aux' tsi = match tsi with
+                | [] -> []
+                | h' :: tl' ->
+                  (aux tl1 tl2 h') @ aux' tl'
+              in
+              let u = try unify h1 h2 si' with _ -> [] in
+              aux' u
+          in
+          match (aux args args' si) with
+          | [] -> raise SymbolClash
+          | res -> res 
+        
         else begin raise SymbolClash end
 
       (* Unification d'une variable avec un term *)
@@ -138,10 +152,10 @@ let rec unify s t si =
       | _ , Var v -> unify t s si
 
       (* Unification d'un symbol simple avec un symbol AC *)
-      | Symb(_, _), SymbAC(_, _) -> begin raise SymbolClash end
+      | Symb _, SymbAC _ -> begin raise SymbolClash end
 
       (* Unification d'un symbol AC avec un symbol simple *)
-      | SymbAC(_, _), Symb(_, _) -> begin raise SymbolClash end
+      | SymbAC _, Symb _ -> begin raise SymbolClash end
 
       (* Unification de deux symbol AC --> algo unification modulo AC *)
       | SymbAC _, SymbAC _ ->
@@ -161,14 +175,6 @@ let rec unify s t si =
             let sum = sub_term real_sigma sum in
             let sym = sub_term real_sigma sym in
 
-(*
-            let () =
-              print_endline "******************************************************";
-              print_endline ((string_of_term sym) ^ " = " ^ (string_of_term sum) ^ ", " ^ (string_of_term (snd (fst h))));
-              print_endline (string_of_si (real_sigma));
-              print_endline "******************************************************";
-            in
-*)
            if eq s t then unifyAC tl sigma real_sigma
             else
 
@@ -204,10 +210,22 @@ let rec unify s t si =
               begin
                 match sigma' with
                 | None -> None
-                | Some s' -> unifyAC tl new_sigma (List.hd s') 
+                | Some s' ->
+                  let rec aux l = match l with
+                    | [] -> []
+                    | h' :: tl' ->
+                      begin
+                        match unifyAC tl new_sigma h' with
+                        | None -> aux tl'
+                        | Some l' -> l' @ aux tl'
+                      end
+                  in
+                  match (aux s') with
+                  | [] -> None
+                  | ll -> Some ll
               end
 
-            | _ , SymbAC (_, _) ->
+            | _ , SymbAC _ ->
               let permut = permut_list ((var,sym), sum) sigma in
               let permut = List.filter (fun ((k,v),si) -> eq sym (sub_term si sum)) permut in
 
@@ -229,8 +247,18 @@ let rec unify s t si =
                 match (try Some (unify sym sum real_sigma) with _ -> None) with
                 | None -> None
                 | Some new_sigma ->
-                  let ns = List.hd new_sigma in
-                  unifyAC tl sigma (ns) 
+                  let rec aux l = match l with
+                    | [] -> []
+                    | h' :: tl' ->
+                      begin
+                        match unifyAC tl sigma h' with
+                        | None -> aux tl'
+                        | Some l' -> l' @ aux tl'
+                      end
+                  in
+                  match (aux new_sigma) with
+                  | [] -> None
+                  | ll -> Some ll
               end
 
             | SymbAC _, _ -> failwith "Error"
@@ -258,93 +286,3 @@ let rec unify s t si =
           let ac2 = sub_term si1 ac2 in
           unify ac1 ac2 si
     end;;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-let x = mk_Var "x";;
-let x1 = mk_Var "x1";;
-let x2 = mk_Var "x2";;
-let x3 = mk_Var "x3";;
-let x4 = mk_Var "x4";;
-let x5 = mk_Var "x5";;
-let x6 = mk_Var "x6";;
-let x7 = mk_Var "x7";;
-let x8 = mk_Var "x8";;
-let x9 = mk_Var "x9";;
-
-let y = mk_Var "y";;
-let z = mk_Var "z";;
-let t = mk_Var "t";;
-let u = mk_Var "u";;
-let w = mk_Var "w";;
-
-let a = mk_Symb {name="a" ; arity=0}  []
-let a1 = mk_Symb {name="a1" ; arity=0}  []
-let a2 = mk_Symb {name="a2" ; arity=0}  []
-let a3 = mk_Symb {name="a3" ; arity=0}  []
-let a4 = mk_Symb {name="a4" ; arity=0}  []
-
-let b = mk_Symb {name="b" ; arity=0}  []
-let b1 = mk_Symb {name="b1" ; arity=0}  []
-let b2 = mk_Symb {name="b2" ; arity=0}  []
-let b3 = mk_Symb {name="b3" ; arity=0}  []
-let b4 = mk_Symb {name="b4" ; arity=0}  []
-
-let c = mk_Symb {name="c" ; arity=0}  []
-let c1 = mk_Symb {name="c1" ; arity=0}  []
-let c2 = mk_Symb {name="c2" ; arity=0}  []
-let c3 = mk_Symb {name="c3" ; arity=0}  []
-let c4 = mk_Symb {name="c4" ; arity=0}  []
-
-let d = mk_Symb {name="d" ; arity=0}  []
-let d1 = mk_Symb {name="d1" ; arity=0}  []
-let d2 = mk_Symb {name="d2" ; arity=0}  []
-let d3 = mk_Symb {name="d3" ; arity=0}  []
-let d4 = mk_Symb {name="d4" ; arity=0}  []
-
-let e = mk_Symb {name="e" ; arity=0}  []
-let e1 = mk_Symb {name="e1" ; arity=0}  []
-let e2 = mk_Symb {name="e2" ; arity=0}  []
-let e3 = mk_Symb {name="e3" ; arity=0}  []
-let e4 = mk_Symb {name="e4" ; arity=0}  []
-
-let f x = mk_Symb {name="f" ; arity=1}  [x]
-let g x = mk_Symb {name="g" ; arity=1}  [x]
-
-
-
-let plus s = mk_SymbAC {name="+"} s;;
-let moins s = mk_SymbAC {name="-"} s;;
-let fois s = mk_SymbAC {name="."} s;;
-
-
-
-let test s t  =
- 
-  let t1 = Sys.time () in
-  let u = unify s t (Si.empty) in
-  let t2 = Sys.time () in
-  let u = List.map (fun x -> sub_si x x) u in
-  let nf = List.filter (fun x -> not (eq2 x s t)) u in
-  print_endline ((string_of_term s) ^ " = " ^ (string_of_term t));
-  print_endline ("Temps : " ^ (string_of_float ((-.) t2 t1)));
-  print_endline ("Nombre de resultat : " ^ (string_of_int(List.length u)));
-  print_endline ("Nombre de resultat faux : " ^ (string_of_int (List.length nf)));
-  List.iter (fun x -> print_endline (string_of_si x)) nf;
-  print_endline "";;

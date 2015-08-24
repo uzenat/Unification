@@ -64,13 +64,14 @@ let moins s = mk_SymbAC {name="-"} s;;
 let test s t  =
  
   let t1 = Sys.time () in
-  let u = unify s t (Si.empty) in
+  let uu = unify s t (Si.empty) in
   let t2 = Sys.time () in
-  let u = List.map (fun x -> sub_si x x) u in
+  let u = List.map (fun x -> sub_si x x) uu in
   let nf = List.filter (fun x -> not (eq2 x s t)) u in
   print_endline ((string_of_term s) ^ " = " ^ (string_of_term t));
   print_endline ("Temps : " ^ (string_of_float ((-.) t2 t1)));
   print_endline ("Nombre de resultat : " ^ (string_of_int(List.length u)));
+  print_endline ((string_of_term (sub_term (List.hd u) s)) ^ " = " ^ (string_of_term (sub_term (List.hd u) t)));
   print_endline ("Nombre de resultat faux : " ^ (string_of_int (List.length nf)));
   List.iter (fun x -> print_endline (string_of_si x)) nf;
   print_endline "";;
@@ -134,8 +135,8 @@ let () =
   (* Test avec tout *)
 
   (* test 10 *)
-  let s10 = plus [ f x ; f a ] in
-  let t10 = plus [ f y ; f b ] in
+  let s10 = moins [ f y ; f a ] in
+  let t10 = moins [ f x ; f b ] in
   test s10 t10;
 
   (* test 11 *)
@@ -154,8 +155,8 @@ let () =
   test s13 t13;
 
   (* test 14 *)
-  let s14 = plus [ f (f (f (f (f x)))) ; z ] in
-  let t14 = plus [ f (f (f (f (f a)))) ; x ] in
+  let s14 = fois [ f (f (f (f (f x)))) ; z ] in
+  let t14 = fois [ f (f (f (f (f a)))) ; x ] in
   test s14 t14;
 
   (* test 15 *)
@@ -177,6 +178,16 @@ let () =
   let s18 = plus [ s13 ; s3 ] in
   let t18 = plus [ t13 ; t3 ] in
   test s18 t18;
+
+  (* test 19 *)
+  let s19 = plus [ s10 ; t14 ] in
+  let t19 = plus [ s14 ; t10 ] in
+  test s19 t19;
+
+  (* test 20 *)
+  let s20 = moins [ fois [ x ; x ] ; fois [ y ; y ] ] in
+  let t20 = moins [ fois [ a ; a ] ; fois [ b ; b ] ] in
+  test s20 t20;
 
   
 
